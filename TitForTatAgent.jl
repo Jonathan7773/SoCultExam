@@ -1,4 +1,5 @@
 using Pkg
+using Plots
 
 using ActiveInference
 using LinearAlgebra
@@ -73,7 +74,7 @@ B_matrix[1][4,:,2] = [0.5,0.5,0.5,0.5]
 B_matrix[1]
 
 C = array_of_any_zeros(4)
-C[1][1] = 2.0 # CC
+C[1][1] = 3.0 # CC
 C[1][2] = 0.0 # CD
 C[1][3] = 3.0 # DC
 C[1][4] = 1.0 # DD
@@ -112,8 +113,16 @@ mutable struct TitForTatAgent
     end
 end
 
-function update_TFT(agent::TitForTatAgent, opponent_action::Vector{Int64})
-    agent.last_opponent_action = opponent_action
+function update_TFT(agent::TitForTatAgent, observation::Vector{Int64})
+    if observation == [1]
+        agent.last_opponent_action = [1]
+    elseif observation == [2]
+        agent.last_opponent_action = [2]
+    elseif observation == [3]
+        agent.last_opponent_action = [1]
+    else
+        agent.last_opponent_action = [2]
+    end
 end
 
 function choose_action_TFT(agent::TitForTatAgent)
@@ -121,7 +130,6 @@ function choose_action_TFT(agent::TitForTatAgent)
 end
 
 TFT_agent = TitForTatAgent()
-
 ########## Trial loop ###########
 
 N_TRIALS = 160
@@ -173,25 +181,7 @@ for t in 1:N_TRIALS
 
 end
 
-actions_TFT_store[4]
-obs2
-
-obs1, obs2, score_AIF, score_TFT = trial(env, 1, 1)
-
-TFT_agent.last_opponent_action
-
-action_TFT_agent = choose_action_TFT(TFT_agent)
-action_TFT_agent = Int(action_TFT_agent[1])
-
-
-action_AIF_agent = sample_action!(AIF_agent)
-action_AIF_agent = Int(action_AIF_agent[1])
-
-obs1 = [findfirst(isequal(obs1), conditions)]
-obs2 = [findfirst(isequal(obs2), conditions)]
-
-
-action_matrix = [actions_samuel_store'; actions_jonathan_store']
+action_matrix = [actions_AIF_store'; actions_TFT_store']
 
 cmap = ["green", "red"]
 
@@ -199,9 +189,9 @@ cmap = ["green", "red"]
 heatmap(action_matrix, color=cmap,
         clims = (1,2),
         legend=false, ylabel="Agent",
-        yticks=(1:2, ["Samuel", "Jonathan"]),
+        yticks=(1:2, ["AIF", "TFT"]),
         size=(1000, 80))
 
-
+AIF_agent.B[1]
 
 
