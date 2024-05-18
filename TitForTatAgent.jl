@@ -1,8 +1,16 @@
 using Pkg
-using Plots
+using Revise
 
-using ActiveInference
+#====================================== ***PATHS*** ======================================# 
+Pkg.activate("C:\\Users\\Samuel\\Desktop\\Julia_projects\\Julia-Development")
+Pkg.develop(path="C:\\Users\\Samuel\\dev\\ActiveInference")
+
 using LinearAlgebra
+using ActiveInference
+using Plots
+using StatsPlots
+using Distributions
+using ActionModels
 
 ###### Defining environment ###########
 
@@ -75,9 +83,9 @@ B_matrix[1]
 
 C = array_of_any_zeros(4)
 C[1][1] = 3.0 # CC
-C[1][2] = 0.0 # CD
-C[1][3] = 3.0 # DC
-C[1][4] = 1.0 # DD
+C[1][2] = 1.0 # CD
+C[1][3] = 4.0 # DC
+C[1][4] = 2.0 # DD
 
 # Parameterize and keep rations
 beta = 10.0
@@ -90,7 +98,7 @@ for i in eachindex(pB)
 end
 
 settings=Dict("use_param_info_gain" => true,
-              "action_selection" => "stochastic")
+              "action_selection" => "deterministic")
 
 parameters=Dict("alpha" => 16.0,
                 "lr_pB" => 0.1)
