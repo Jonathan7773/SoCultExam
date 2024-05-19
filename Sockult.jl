@@ -1,28 +1,16 @@
 using Pkg
 using Revise
 using Plots
-
-#Pkg.activate(url = "C:\\Users\\Samuel\\Desktop\\Julia_projects\\Julia-Development")
-Pkg.develop(path=raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\Continued_ActiveInference\Dev_Branch\ActiveInference.jl")
-#Pkg.develop(path="C:\\Users\\Samuel\\dev\\ActiveInference")
-
-#Pkg.add(url="https://github.com/samuelnehrer02/ActiveInference.jl.git")
-
 using ActiveInference
 using LinearAlgebra
 
 conditions = ["CC","CD","DC", "DD"]
-
 states = [4]
 observations = [4]
 actions = ["COOPERATE", "DEFECT"]
-
 controls = [length(actions)]
-
 A_matrix, B_matrix = generate_random_GM(states, observations, controls)
-
 A_matrix[1] = Matrix{Float64}(I, 4, 4)
-
 
 # When you cooperate, the is a zero probability that the observation will start with D and VV
 for i in eachindex(B_matrix)
@@ -49,21 +37,16 @@ C[1] = softmax(C[1] * β)
 
 pB = deepcopy(B_matrix)
 
-
-####= I am not sure how to set this up! xD 
 for i in eachindex(pB)
     pB[i] = pB[i] .* 2.0
 end
-
-
 
 settings=Dict("use_param_info_gain" => false,
               "use_states_info_gain" => false,
               "action_selection" => "deterministic")
 
-parameters_samuel=Dict{String, Real}("lr_pB" => 0.6)
-parameters_jonathan=Dict{String, Real}("lr_pB" => 0.6)
-
+parameters_samuel=Dict{String, Real}("lr_pB" => 0.2)
+parameters_jonathan=Dict{String, Real}("lr_pB" => 0.2)
 
 SAMUEL = init_aif(A_matrix, B_matrix;
                     C=C,
@@ -76,7 +59,6 @@ JONATHAN = init_aif(A_matrix, B_matrix;
                     pB=pB,
                     settings=settings,
                     parameters=parameters_jonathan);
-
 
 env = PrisonersDilemmaEnv()
 
@@ -138,22 +120,23 @@ obs_jonathan_store = []
 end
 action_matrix = [actions_samuel_store'; actions_jonathan_store']
 
-cmap = [:springgreen, :brown2]
+cmap = [:lightgoldenrod1, :midnightblue]
 
 # Plot the heatmap
-heatmap(action_matrix, color=cmap,
+p = heatmap(action_matrix, color=cmap,
         clims = (1,2),
+        title="η = 0.2 β = 1.0",
         legend=false, ylabel="Agent",
-        yticks=(1:2, ["Samuel", "Jonathan"]),
+        yticks=(1:2, ["Agent 1", "Agent 2"]),
         xticks=(0:10:160),
-        size=(1000, 100))
-
-
-#############  #############  #############  #############  ############# 
-##########################  BIG SIMULATION ########################### 
+        size=(1000, 160))
+#=
+savefig(p, "IPD_eta02_beta1.png")
+=#
+##########################  BIG SIMULATION - Symmetrical ########################### 
 
 using Random
-learning_rates = 0.01:0.01:0.60
+learning_rates = 0.01:0.01:1.0
 results = []
 
 function init_agents(lr_samuel, lr_jonathan)
@@ -246,8 +229,10 @@ end
 using DataFrames
 using Serialization
 using Plots
+using CairoMakie
 
-#results_df = deserialize("data_symmetrical_deterministic.jls")
+#serialize("data_symmetrical_deterministic.jls", results_df)
+results_df = deserialize("data_symmetrical_deterministic.jls")
 
 results_df = DataFrame(results)
 results_df[!, :total_reward] = results_df[!, :score_SAMUEL] .+ results_df[!, :score_JONATHAN]
@@ -259,14 +244,9 @@ y = unique(results_df[!, :lr_jonathan])
 z = Matrix(pivot_df[:, Not(:lr_jonathan)])
 
 heatmap(x, y, z, xlabel="Agent 1 Learning Rates", ylabel="Agent 2 Learning Rates", 
-        title="Accumulated Total Reward", colorbar_title="Total Reward",
-        color=:haline, size =(800,700))
+        title="Accumulated Total Reward - Deterministic", colorbar_title="Total Reward",
+         color=:thermal, size =(800,700))
 
-
-#=
-surface(x, y, z, title="Accumulated Total Reward", color=:haline, camera = (-40,60))
-=#
-
-
-
+#surface(x, y, z,
+#       title="Accumulated Total Reward - Stochastic - Symmetrical",size=(800,700),  camera = (30,40))
 
