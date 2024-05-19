@@ -68,7 +68,8 @@ SAMUEL = init_aif(A_matrix, B_matrix;
                     C=C,
                     pB=pB,
                     settings=settings,
-                    parameters=parameters);
+                    parameters=parameters, 
+                    verbose = false);
 
 JONATHAN = init_aif(A_matrix, B_matrix;
                     C=C,
@@ -146,4 +147,19 @@ heatmap(action_matrix, color=cmap,
         yticks=(1:2, ["Samuel", "Jonathan"]),
         #xticks=(0:10:160),
         size=(1000, 100))
+
+
+
+function printverb(A; verbose::Bool = true)
+    B = A*A
+    if verbose == true & isa(A, Int)
+        print("Hello")
+        return B
+    else
+    end
+end
+
+printverb(2, verbose = false)
+
+
 
