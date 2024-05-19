@@ -3,7 +3,7 @@ using Revise
 using Plots
 
 #Pkg.activate(url = "C:\\Users\\Samuel\\Desktop\\Julia_projects\\Julia-Development")
-Pkg.develop(path=raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\Continued_ActiveInference\Dev_Branch\ActiveInference.jl")
+#Pkg.develop(path=raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\Continued_ActiveInference\Dev_Branch\ActiveInference.jl")
 #Pkg.develop(path="C:\\Users\\Samuel\\dev\\ActiveInference")
 
 #Pkg.add(url="https://github.com/samuelnehrer02/ActiveInference.jl.git")
@@ -59,9 +59,9 @@ end
 
 settings=Dict("use_param_info_gain" => false,
               "use_states_info_gain" => false,
-              "action_selection" => "deterministic")
+              "action_selection" => "stochastic")
 
-parameters=Dict{String, Real}("lr_pB" => 0.6)
+parameters=Dict{String, Real}("lr_pB" => 0.5)
 
 
 SAMUEL = init_aif(A_matrix, B_matrix;
@@ -79,7 +79,7 @@ JONATHAN = init_aif(A_matrix, B_matrix;
 
 env = PrisonersDilemmaEnv()
 
-N_TRIALS = 160
+N_TRIALS = 150
 
 # Starting Observation
 obs1 = [1]
@@ -137,15 +137,13 @@ obs_jonathan_store = []
 end
 action_matrix = [actions_samuel_store'; actions_jonathan_store']
 
-cmap = [:springgreen, :brown2]
+cmap = [:green, :red]
 
 # Plot the heatmap
 heatmap(action_matrix, color=cmap,
         clims = (1,2),
         legend=false, ylabel="Agent",
         yticks=(1:2, ["Samuel", "Jonathan"]),
-        xticks=(0:10:160),
+        #xticks=(0:10:160),
         size=(1000, 100))
-
-
 
