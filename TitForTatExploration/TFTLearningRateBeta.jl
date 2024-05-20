@@ -14,43 +14,13 @@ using ActionModels
 
 ###### Defining environment ###########
 
-mutable struct PrisonersDilemmaEnv
-    score_agent_1::Int
-    score_agent_2::Int
-    conditions::Vector{String}
-
-    function PrisonersDilemmaEnv()
-        new(0, 0, ["CC", "CD", "DC", "DD"])
-    end
-end
-
-function trial(env::PrisonersDilemmaEnv, action_1::Int, action_2::Int)
-
-    if action_1 == 1 && action_2 == 1
-        obs_1 = 1  # CC for Agent 1
-        obs_2 = 1  # CC for Agent 2
-        points_1, points_2 = 3, 3  
-    elseif action_1 == 1 && action_2 == 2
-        obs_1 = 2  # CD for Agent 1
-        obs_2 = 3  # DC for Agent 2
-        points_1, points_2 = 0, 5  
-    elseif action_1 == 2 && action_2 == 1
-        obs_1 = 3  # DC for Agent 1
-        obs_2 = 2  # CD for Agent 2
-        points_1, points_2 = 5, 0  
-    elseif action_1 == 2 && action_2 == 2
-        obs_1 = 4  # DD for Agent 1
-        obs_2 = 4  # DD for Agent 2
-        points_1, points_2 = 1, 1 
-    end
-
-    env.score_agent_1 += points_1
-    env.score_agent_2 += points_2
-
-    return env.conditions[obs_1], env.conditions[obs_2], env.score_agent_1, env.score_agent_2
-end
+include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+include(raw"..\EnvsAndAgents\TitForTatAgent.jl")
 
 env = PrisonersDilemmaEnv()
+
+TFT_agent = TitForTatAgent()
+
 
 ########## Creating Agents ##################
 
@@ -105,71 +75,29 @@ settings=Dict("use_param_info_gain" => false,
 
 
 ########## Creating TitForTatAgent ##############
-mutable struct TitForTatAgent
-    last_opponent_action::Vector{Int64}
-
-    function TitForTatAgent()
-        new([1])
-    end
-end
-
-function update_TFT(agent::TitForTatAgent, observation::Vector{Int64})
-    if observation == [1]
-        agent.last_opponent_action = [1]
-    elseif observation == [2]
-        agent.last_opponent_action = [2]
-    elseif observation == [3]
-        agent.last_opponent_action = [1]
-    else
-        agent.last_opponent_action = [2]
-    end
-end
-
-function choose_action_TFT(agent::TitForTatAgent)
-    return agent.last_opponent_action
-end
-
-function init_agent(lr_AIF, alpha_AIF)
-    parameters_AIF = Dict{String, Real}("lr_pB" => lr_AIF,
-                                            "alpha" => alpha_AIF)
-
-    AIF_agent = init_aif(A_matrix, B_matrix;
-                      C=C,
-                      pB=pB,
-                      settings=settings,
-                      parameters=parameters_AIF,
-                      verbose = false)
-
-    return AIF_agent
-end
-
-
-TFT_agent = TitForTatAgent()
-
-learning_rates = 0.0:0.02:1.0
-alphas = 0.0:0.5:32.0
+learning_rates = 0.001:0.001:1.0
+betas = 0.01:0.01:5.5
 
 results = []
 
-
-total_iterations = length(learning_rates) * length(alphas)
+total_iterations = length(learning_rates) * length(betas)
 current_iteration = 0
 
 @time begin
     # Loop over all combinations of learning rates
     for lr_AIF in learning_rates
-        for alpha_AIF in alphas
+        for beta_AIF in betas
 
             current_iteration += 1
             println("Progress: $current_iteration / $total_iterations")
 
             # Reinitialize agents
-            AIF_agent = init_agent(lr_AIF, alpha_AIF)
+            AIF_agent = init_agent_lr_beta(lr_AIF, beta_AIF)
             
             # Initialize environment
             env = PrisonersDilemmaEnv()
 
-            N_TRIALS = 1000
+            N_TRIALS = 50
 
             # Starting Observation
             obs1 = [1]
@@ -219,7 +147,7 @@ current_iteration = 0
             end
     
             # Save results 
-            push!(results, (lr_AIF=lr_AIF, alpha_AIF, score_AIF_agent=score_AIF_agent, score_TFT_agent=score_TFT_agent))
+            push!(results, (lr_AIF=lr_AIF, beta_AIF = beta_AIF, score_AIF_agent=score_AIF_agent, score_TFT_agent=score_TFT_agent))
         end
     end
 end
@@ -229,15 +157,21 @@ results_df = DataFrame(results)
 results_df[!, :total_reward] = results_df[!, :score_AIF_agent] .+ results_df[!, :score_TFT_agent]
 
 x = unique(results_df[!, :lr_AIF])
-y = unique(results_df[!, :alpha_AIF])
+y = unique(results_df[!, :beta_AIF])
 
-pivot_df = unstack(results_df, :lr_AIF, :alpha_AIF, :total_reward)
-z = Matrix(pivot_df[:, Not(:lr_AIF)])
-
+pivot_df = unstack(results_df, :beta_AIF, :lr_AIF, :total_reward)
+z = Matrix(pivot_df[:, Not(:beta_AIF)])
+theme(:juno)
 
 heatmap(x, y, z,
-        xlabel="Learning Rates", ylabel="Alphas",
-        title="Accumulated Total Reward", colorbar_title="Total Reward",
-        color=:inferno, size=(800, 700))
+        xlabel="Learning Rates", ylabel="Betas",
+        title="Accumulated Total Reward", colorbar_title="Total Reward", size=(800, 700),
+        color=:inferno)
+
+
+z_lr = (results_df[results_df[!, :beta_AIF] .== 1.0, :])[!, :total_reward]
+
+plot(x, z_lr, xlabel = "Learning Rates", ylabel = "Total Score", title = "Betas for lr = 1.0", legend = false)
+
 
 

@@ -11,6 +11,12 @@ using Plots
 using ActiveInference
 using LinearAlgebra
 
+####### Env ##########
+include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+
+env = PrisonersDilemmaEnv()
+
+#############################
 conditions = ["CC","CD","DC", "DD"]
 
 states = [4]
@@ -157,33 +163,12 @@ using Random
 learning_rates = 0.0:0.01:1.0
 results = []
 
-function init_agents(lr_samuel, lr_jonathan)
-    parameters_samuel = Dict{String, Real}("lr_pB" => lr_samuel,
-                                            "alpha" => 16)
-    parameters_jonathan = Dict{String, Real}("lr_pB" => lr_jonathan,
-                                            "alpha" => 16)
-
-    SAMUEL = init_aif(A_matrix, B_matrix;
-                      C=C,
-                      pB=pB,
-                      settings=settings,
-                      parameters=parameters_samuel)
-
-    JONATHAN = init_aif(A_matrix, B_matrix;
-                        C=C,
-                        pB=pB,
-                        settings=settings,
-                        parameters=parameters_jonathan)
-
-    return SAMUEL, JONATHAN
-end
-
 @time begin
     # Loop over all combinations of learning rates
     for lr_samuel in learning_rates
         for lr_jonathan in learning_rates
             # Reinitialize agents
-            SAMUEL, JONATHAN = init_agents(lr_samuel, lr_jonathan)
+            SAMUEL, JONATHAN = init_AIF_agents(lr_samuel, lr_jonathan)
             
             # Initialize environment
             env = PrisonersDilemmaEnv()

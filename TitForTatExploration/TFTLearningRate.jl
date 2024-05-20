@@ -14,43 +14,12 @@ using ActionModels
 
 ###### Defining environment ###########
 
-mutable struct PrisonersDilemmaEnv
-    score_agent_1::Int
-    score_agent_2::Int
-    conditions::Vector{String}
-
-    function PrisonersDilemmaEnv()
-        new(0, 0, ["CC", "CD", "DC", "DD"])
-    end
-end
-
-function trial(env::PrisonersDilemmaEnv, action_1::Int, action_2::Int)
-
-    if action_1 == 1 && action_2 == 1
-        obs_1 = 1  # CC for Agent 1
-        obs_2 = 1  # CC for Agent 2
-        points_1, points_2 = 3, 3  
-    elseif action_1 == 1 && action_2 == 2
-        obs_1 = 2  # CD for Agent 1
-        obs_2 = 3  # DC for Agent 2
-        points_1, points_2 = 0, 5  
-    elseif action_1 == 2 && action_2 == 1
-        obs_1 = 3  # DC for Agent 1
-        obs_2 = 2  # CD for Agent 2
-        points_1, points_2 = 5, 0  
-    elseif action_1 == 2 && action_2 == 2
-        obs_1 = 4  # DD for Agent 1
-        obs_2 = 4  # DD for Agent 2
-        points_1, points_2 = 1, 1 
-    end
-
-    env.score_agent_1 += points_1
-    env.score_agent_2 += points_2
-
-    return env.conditions[obs_1], env.conditions[obs_2], env.score_agent_1, env.score_agent_2
-end
+include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+include(raw"..\EnvsAndAgents\TitForTatAgent.jl")
 
 env = PrisonersDilemmaEnv()
+
+TFT_agent = TitForTatAgent()
 
 ########## Creating Agents ##################
 
@@ -98,65 +67,31 @@ for i in eachindex(pB)
     pB[i] = pB[i] .* 2.0
 end
 
-
 settings=Dict("use_param_info_gain" => false,
               "use_states_info_gain" => false,
               "action_selection" => "deterministic")
 
 
-########## Creating TitForTatAgent ##############
-mutable struct TitForTatAgent
-    last_opponent_action::Vector{Int64}
 
-    function TitForTatAgent()
-        new([1])
-    end
-end
-
-function update_TFT(agent::TitForTatAgent, observation::Vector{Int64})
-    if observation == [1]
-        agent.last_opponent_action = [1]
-    elseif observation == [2]
-        agent.last_opponent_action = [2]
-    elseif observation == [3]
-        agent.last_opponent_action = [1]
-    else
-        agent.last_opponent_action = [2]
-    end
-end
-
-function choose_action_TFT(agent::TitForTatAgent)
-    return agent.last_opponent_action
-end
-
-TFT_agent = TitForTatAgent()
-
-learning_rates = 0.0:0.01:1.0
+learning_rates = 0.01:0.01:1.0
 results = []
 
-function init_agent(lr_AIF)
-    parameters_AIF = Dict{String, Real}("lr_pB" => lr_AIF,
-                                            "alpha" => 16)
-
-    AIF_agent = init_aif(A_matrix, B_matrix;
-                      C=C,
-                      pB=pB,
-                      settings=settings,
-                      parameters=parameters_AIF)
-
-    return AIF_agent
-end
+total_iterations = length(learning_rates)
+current_iteration = 0
 
 @time begin
 # Loop over all combinations of learning rates
     for lr_AIF in learning_rates
+
+        current_iteration += 1
+        println("Progress: $current_iteration / $total_iterations")
         # Reinitialize agents
-        AIF_agent = init_agent(lr_AIF)
+        AIF_agent = init_agent_lr(lr_AIF)
         
         # Initialize environment
         env = PrisonersDilemmaEnv()
 
-        N_TRIALS = 600
+        N_TRIALS = 1000
 
         # Starting Observation
         obs1 = [1]
@@ -196,16 +131,12 @@ end
             action_TFT_agent = Int(action_TFT_agent[1])
             push!(actions_TFT_store, action_TFT_agent)
         
-            println(" **** At Trial: $(t) **** \n AIF_agent Plays: $(action_AIF_agent) \n TFT_agent Plays: $(action_TFT_agent)")
             obs1, obs2, score_AIF_agent, score_TFT_agent = trial(env, action_AIF_agent, action_TFT_agent)
             obs1 = [findfirst(isequal(obs1), conditions)]
             obs2 = [findfirst(isequal(obs2), conditions)]
         
             push!(obs_AIF_store, obs1)
             push!(obs_TFT_store, obs2)
-            
-            println("AIF_agent OBSERVES: $(obs1) \n SCORE AIF_agent: $(score_AIF_agent)")
-            println("TFT_agent OBSERVES: $(obs2) \n SCORE TFT_agent: $(score_TFT_agent)")
         
         end
 
