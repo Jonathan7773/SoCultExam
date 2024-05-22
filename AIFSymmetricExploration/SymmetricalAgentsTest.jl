@@ -13,6 +13,7 @@ using LinearAlgebra
 
 ####### Env ##########
 include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+include(raw"..\EnvsAndAgents\GenerativeModel.jl")
 
 env = PrisonersDilemmaEnv()
 

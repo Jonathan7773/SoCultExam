@@ -16,6 +16,7 @@ using ActionModels
 
 include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
 include(raw"..\EnvsAndAgents\TitForTatAgent.jl")
+include(raw"..\EnvsAndAgents\GenerativeModel.jl")
 
 env = PrisonersDilemmaEnv()
 

@@ -1,29 +1,5 @@
 using ActiveInference
 
-mutable struct TitForTatAgent
-    last_opponent_action::Vector{Int64}
-
-    function TitForTatAgent()
-        new([1])
-    end
-end
-
-function update_AlgoAgent(agent::TitForTatAgent, observation::Vector{Int64})
-    if observation == [1]
-        agent.last_opponent_action = [1]
-    elseif observation == [2]
-        agent.last_opponent_action = [2]
-    elseif observation == [3]
-        agent.last_opponent_action = [1]
-    else
-        agent.last_opponent_action = [2]
-    end
-end
-
-function choose_action_TFT(agent::TitForTatAgent)
-    return agent.last_opponent_action
-end
-
 function init_agent_lr_alpha(lr_AIF, alpha_AIF)
     parameters_AIF = Dict{String, Real}("lr_pB" => lr_AIF,
                                             "alpha" => alpha_AIF)
@@ -98,4 +74,3 @@ function init_agent_lr(lr_AIF)
 
     return AIF_agent
 end
-
