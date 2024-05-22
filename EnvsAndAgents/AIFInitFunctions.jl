@@ -74,3 +74,15 @@ function init_agent_lr(lr_AIF)
 
     return AIF_agent
 end
+
+
+function init_AIF(settings, parameters)
+    AIF_agent = init_aif(A_matrix, B_matrix;
+                      C=C,
+                      pB=pB,
+                      settings=settings,
+                      parameters=parameters,
+                      verbose = false)
+
+    return AIF_agent
+end
