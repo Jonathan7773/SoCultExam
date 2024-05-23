@@ -2,6 +2,8 @@ using ActiveInference
 using Distributed
 using DataFrames
 using Serialization
+using Statistics
+using Plots
 
 addprocs(10)
 
@@ -14,8 +16,6 @@ addprocs(10)
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
                     "action_selection" => "stochastic")
-
-    parameters = Dict{String, Real}("lr_pB" => 0.1)
 
     env = PrisonersDilemmaEnv()
 
@@ -41,10 +41,10 @@ addprocs(10)
         "GrimTriggerAgent"
     ]
 
-    function run_simulation(agent2_constructor, AlgoAgent_name, alpha, beta, lr_pB, fr_pB)
+    function run_simulation(AlgoAgent_constructor, AlgoAgent_name, alpha, beta, lr_pB, fr_pB)
         # Initialize agents
         AIF_agent = init_AIF_agent_full(alpha, beta, lr_pB, fr_pB)
-        AlgoAgent = agent2_constructor()
+        AlgoAgent = AlgoAgent_constructor()
 
         # Initialize environment
         env = PrisonersDilemmaEnv()
@@ -61,6 +61,8 @@ addprocs(10)
         obs_AIF_agent_store = []
         obs_AlgoAgent_store = []
 
+        AIF_EFE_store = []
+
         score_AIF_agent = 0
         score_AlgoAgent = 0
 
@@ -75,7 +77,8 @@ addprocs(10)
                 update_B!(AIF_agent, QS_prev)
             end
 
-            infer_policies!(AIF_agent)
+            q_pi_AIF, EFE_AIF = infer_policies!(AIF_agent)
+            push!(AIF_EFE_store, EFE_AIF[1])
             
             action_AIF_agent = sample_action!(AIF_agent)
             action_AlgoAgent = choose_action_AlgoAgent(AlgoAgent)
@@ -128,6 +131,8 @@ AlgoAgent_names = [
 ]
 
 
+
+
 results = []
 
 @time begin
@@ -148,42 +153,26 @@ results = []
     end
 end
 
+
 results_df = DataFrame(results)
 
-jls_filename = raw"SoCultRepo\SoCultExam\ResultData\results_df.jls"
-
-open(jls_filename, "w") do io
-    serialize(io, results_df)
-end
+grouped_df = combine(groupby(results_df, [:alpha, :beta, :lr_pB, :fr_pB]),
+                     :score_AIF_agent => mean => :mean_score_AIF,
+                     :score_AlgoAgent => mean => :mean_score_Algo)
 
 
+sorted_df = sort(grouped_df, :mean_score_AIF, rev=true)
 
-SoCultRepo\SoCultExam\ResultData
 
-agent_scores = Dict{String, Int64}()
 
-for row in eachrow(results_df)
-    agent1_name = row[:agent1_name]
-    agent2_name = row[:agent2_name]
-    score_agent1 = row[:score_agent1]
-    score_agent2 = row[:score_agent2]
 
-    if !haskey(agent_scores, agent1_name)
-        agent_scores[agent1_name] = 0
-    end
-    if !haskey(agent_scores, agent2_name)
-        agent_scores[agent2_name] = 0
-    end
+alphas = unique(grouped_df.alpha)
+betas = unique(grouped_df.beta)
+lr_pBs = unique(grouped_df.lr_pB)
+fr_pBs = unique(grouped_df.fr_pB)
 
-    agent_scores[agent1_name] += score_agent1
-    agent_scores[agent2_name] += score_agent2
-end
 
-agent_names = collect(keys(agent_scores))
-total_scores = collect(values(agent_scores))
 
-total_scores_df = DataFrame(agent_name=agent_names, total_score=total_scores)
 
-ranked_scores_df = sort(total_scores_df, :total_score, rev=true)
 
-ranked_scores_df
+
