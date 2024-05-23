@@ -31,7 +31,7 @@ B_matrix[1][4,:,2] = [0.5,0.5,0.5,0.5]
 C = array_of_any_zeros(4)
 C[1][1] = 3.0 # CC
 C[1][2] = 1.0 # CD
-C[1][3] = 4.0 # DC
+C[1][3] = 2.0 # DC
 C[1][4] = 2.0 # DD
 
 # Parameterize preferences
