@@ -15,7 +15,7 @@ addprocs(10)
 
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
-                    "action_selection" => "stochastic")
+                    "action_selection" => "deterministic")
 
     env = PrisonersDilemmaEnv()
 
@@ -41,9 +41,9 @@ addprocs(10)
         "GrimTriggerAgent"
     ]
 
-    function run_simulation(AlgoAgent_constructor, AlgoAgent_name, alpha, beta, lr_pB, fr_pB)
+    function run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB, fr_pB)
         # Initialize agents
-        AIF_agent = init_AIF_agent_full(alpha, beta, lr_pB, fr_pB)
+        AIF_agent = init_AIF_agent_full_eksA(beta, lr_pB, fr_pB)
         AlgoAgent = AlgoAgent_constructor()
 
         # Initialize environment
@@ -77,8 +77,7 @@ addprocs(10)
                 update_B!(AIF_agent, QS_prev)
             end
 
-            q_pi_AIF, EFE_AIF = infer_policies!(AIF_agent)
-            push!(AIF_EFE_store, EFE_AIF[1])
+            infer_policies!(AIF_agent)
             
             action_AIF_agent = sample_action!(AIF_agent)
             action_AlgoAgent = choose_action_AlgoAgent(AlgoAgent)
@@ -98,14 +97,19 @@ addprocs(10)
         
         end
         
-        return (AIF_agent="AIF_agent", AlgoAgent_name=AlgoAgent_name, score_AIF_agent=score_AIF_agent, score_AlgoAgent=score_AlgoAgent, alpha = alpha, beta = beta, lr_pB = lr_pB, fr_pB = fr_pB)
+        return (AIF_agent="AIF_agent", AlgoAgent_name=AlgoAgent_name, score_AIF_agent=score_AIF_agent, score_AlgoAgent=score_AlgoAgent, beta = beta, lr_pB = lr_pB, fr_pB = fr_pB)
     end
 end
 
-alphas = 1.0:2.0:32
+alphas = 1.0
 betas = 0.5:0.5:5.5
 lr_pBs = 0.1:0.1:1.0
 fr_pBs = 0.1:0.1:1.0
+
+alphas = 1.0
+betas = 2.5
+lr_pBs = 0.5
+fr_pBs = 0.5
 
 length(alphas)*length(betas)*length(lr_pBs)*length(fr_pBs)*length(AlgoAgent_names)
 
@@ -130,10 +134,36 @@ AlgoAgent_names = [
     "GrimTriggerAgent"
 ]
 
-
-
-
 results = []
+
+@time begin
+    results = @distributed (append!) for beta in betas
+        local_results = []
+        println("Running simulation: beta=$beta")
+        for lr_pB in lr_pBs
+            for fr_pB in fr_pBs
+                for (AlgoAgent_constructor, AlgoAgent_name) in zip(AlgoAgent_constructors, AlgoAgent_names)
+                    #println("Running simulation: AIF_agent vs $AlgoAgent_name with alpha=$alpha, beta=$beta, lr_pB=$lr_pB, fr_pB=$fr_pB")
+                    result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB, fr_pB)
+                    push!(local_results, result)
+                end
+            end
+        end
+        local_results
+    end
+end
+
+results_df = DataFrame(results)
+
+grouped_df = combine(groupby(results_df, [:beta, :lr_pB, :fr_pB]),
+                     :score_AIF_agent => sum => :total_score_AIF,
+                     :score_AlgoAgent => sum => :total_score_Algo)
+
+
+sorted_df = sort(grouped_df, :total_score_AIF, rev=true)
+
+
+
 
 @time begin
     results = @distributed (append!) for alpha in alphas
@@ -153,17 +183,16 @@ results = []
     end
 end
 
-
 results_df = DataFrame(results)
 
 grouped_df = combine(groupby(results_df, [:alpha, :beta, :lr_pB, :fr_pB]),
-                     :score_AIF_agent => mean => :mean_score_AIF,
-                     :score_AlgoAgent => mean => :mean_score_Algo)
+                     :score_AIF_agent => sum => :mean_score_AIF,
+                     :score_AlgoAgent => sum => :mean_score_Algo)
 
 
 sorted_df = sort(grouped_df, :mean_score_AIF, rev=true)
 
-
+view(sorted_df, 580:600, :)
 
 
 alphas = unique(grouped_df.alpha)

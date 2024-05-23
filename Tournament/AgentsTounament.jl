@@ -12,9 +12,11 @@ addprocs(10)
 
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
-                    "action_selection" => "stochastic")
+                    "action_selection" => "deterministic")
 
-    parameters = Dict{String, Real}("lr_pB" => 0.1)
+    # parameters = Dict{String, Real}("lr_pB" => 0.81,
+    #                                 "fr_pB" => 0.11,
+    #                                 "alpha" => 0.79)
 
     env = PrisonersDilemmaEnv()
 
@@ -27,7 +29,7 @@ addprocs(10)
         PavlovianAgent,
         GrofmanAgent,
         GrimTriggerAgent,
-        () -> init_AIF(settings, parameters)
+        () -> init_AIF_agent_full(0.79, 0.31, 0.81, 0.11)
     ]
 
     agent_names = [
@@ -49,7 +51,7 @@ addprocs(10)
         # Initialize environment
         env = PrisonersDilemmaEnv()
 
-        N_TRIALS = 1000
+        N_TRIALS = 10
 
         # Starting Observation
         obs1 = [1]

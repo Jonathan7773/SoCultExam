@@ -14,14 +14,14 @@ using DataFrames
 
 ###### Defining environment ###########
 
-include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
-include(raw"..\EnvsAndAgents\TitForTatAgent.jl")
+include(raw"..\EnvsAndAgents\AIFInitFunctions.jl")
+include(raw"..\EnvsAndAgents\AlgoAgentsFunctions.jl")
 include(raw"..\EnvsAndAgents\GenerativeModel.jl")
+include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
 
 env = PrisonersDilemmaEnv()
 
 TFT_agent = TitForTatAgent()
-
 
 ########## Creating Agents ##################
 
@@ -48,12 +48,12 @@ current_iteration = 0
             println("Progress: $current_iteration / $total_iterations")
 
             # Reinitialize agents
-            AIF_agent = init_agent_lr_beta(lr_AIF, beta_AIF)
+            AIF_agent = init_AIF_agent_beta_lr_pB(lr_AIF, beta_AIF)
             
             # Initialize environment
             env = PrisonersDilemmaEnv()
 
-            N_TRIALS = 1000
+            N_TRIALS = 100
 
             # Starting Observation
             obs1 = [1]
@@ -74,7 +74,7 @@ current_iteration = 0
                 infer_states!(AIF_agent, obs1)
             
                 # Taking the first observation as last action
-                update_TFT(TFT_agent, obs2)
+                update_AlgoAgent(TFT_agent, obs2)
             
                 # Update Transitions SAMUEL
                 if get_states(AIF_agent)["action"] !== missing
@@ -89,7 +89,7 @@ current_iteration = 0
                 action_AIF_agent = Int(action_AIF_agent[1])
                 push!(actions_AIF_store, action_AIF_agent)
             
-                action_TFT_agent = choose_action_TFT(TFT_agent)
+                action_TFT_agent = choose_action_AlgoAgent(TFT_agent)
                 action_TFT_agent = Int(action_TFT_agent[1])
                 push!(actions_TFT_store, action_TFT_agent)
             
