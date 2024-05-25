@@ -41,16 +41,12 @@ C[1] = softmax(C[1] * β)
 
 pB = deepcopy(B_matrix)
 
-for i in eachindex(pB)
-    pB[i] = pB[i] .* 2.0
-end
-
 settings=Dict("use_param_info_gain" => false,
               "use_states_info_gain" => false,
               "action_selection" => "deterministic")
 
-parameters_samuel=Dict{String, Real}("lr_pB" => 0.2)
-parameters_jonathan=Dict{String, Real}("lr_pB" => 0.2)
+parameters_samuel=Dict{String, Real}("lr_pB" => 0.2, "fr_pB" => 1.0)
+parameters_jonathan=Dict{String, Real}("lr_pB" => 0.2, "fr_pB" => 1.0)
 
 SAMUEL = init_aif(A_matrix, B_matrix;
                     C=C,
@@ -132,8 +128,30 @@ p = heatmap(action_matrix, color=cmap,
         title="η = 0.2 β = 1.0",
         legend=false, ylabel="Agent",
         yticks=(1:2, ["Agent 1", "Agent 2"]),
-        xticks=(0:10:160),
+        xticks=(0:10:500),
         size=(1000, 160))
+
+
+get_history(SAMUEL)
+efe = get_history(SAMUEL, "prior")
+
+series1 = [x[1][1] for x in efe]
+series2 = [x[1][2] for x in efe]
+series3 = [x[1][3] for x in efe]
+series4 = [x[1][4] for x in efe]
+
+# Generate the time points
+time_points = 1:length(efe)
+
+# Plot the time series
+plot(time_points, series1, label="CC", xlabel="Trial", ylabel="Prior", linewidth=1, color=:green3)
+plot!(time_points, series2, label="CD", linewidth=1, color=:firebrick)
+plot!(time_points, series3, label="DC", linewidth=1, color=:blue)
+plot!(time_points, series4, label="DD", linewidth=1, color=:orange)
+
+# Display the plot
+display(plot)
+
 #=
 savefig(p, "IPD_eta02_beta1.png")
 =#
@@ -144,8 +162,8 @@ learning_rates = 0.01:0.01:1.0
 results = []
 
 function init_agents(lr_samuel, lr_jonathan)
-    parameters_samuel = Dict{String, Real}("lr_pB" => lr_samuel)
-    parameters_jonathan = Dict{String, Real}("lr_pB" => lr_jonathan)
+    parameters_samuel = Dict{String, Real}("fr_pB" => lr_samuel, "alpha" => 8.0)
+    parameters_jonathan = Dict{String, Real}("fr_pB" => lr_jonathan, "alpha" => 8.0)
 
     SAMUEL = init_aif(A_matrix, B_matrix;
                       C=C,
@@ -233,7 +251,7 @@ end
 
 
 #serialize("data_symmetrical_deterministic.jls", results_df)
-results_df = deserialize("data_symmetrical_deterministic.jls")
+#results_df = deserialize("data_symmetrical_deterministic.jls")
 
 results_df = DataFrame(results)
 results_df[!, :total_reward] = results_df[!, :score_SAMUEL] .+ results_df[!, :score_JONATHAN]
@@ -244,9 +262,9 @@ x = unique(results_df[!, :lr_samuel])
 y = unique(results_df[!, :lr_jonathan])
 z = Matrix(pivot_df[:, Not(:lr_jonathan)])
 
-heatmap(x, y, z, xlabel="Agent 1 Learning Rates", ylabel="Agent 2 Learning Rates", 
-        title="Accumulated Total Reward - Deterministic", colorbar_title="Total Reward",
-         color=:thermal, size =(800,700))
+heatmap(x, y, z, xlabel="Agent 1 Forgetting Rates", ylabel="Agent 2 Forgetting Rates", 
+        title="Accumulated Total Reward - Stochastic", colorbar_title="Total Reward",
+         color=:inferno, size =(800,700))
 
 #surface(x, y, z,
 #       title="Accumulated Total Reward - Stochastic - Symmetrical",size=(800,700),  camera = (30,40))
