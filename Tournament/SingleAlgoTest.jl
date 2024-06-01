@@ -17,6 +17,30 @@ using Plots
                     "use_states_info_gain" => false,
                     "action_selection" => "deterministic")
 
+    function init_AIF_Agent()
+        parameters_AIF = Dict{String, Real}(
+        "lr_pB" => 0.5,
+        "alpha" => 16
+        )
+
+        C = array_of_any_zeros(4)
+        C[1][1] = 4.0 # CC
+        C[1][2] = 1.0 # CD
+        C[1][3] = 3.0 # DC
+        C[1][4] = 2.0 # DD
+
+        β = 1.5
+        C[1] = softmax(C[1] * β)
+
+        AIF_agent = init_aif(A_matrix, B_matrix;
+                        C=C,
+                        pB=pB,
+                        settings=settings,
+                        parameters=parameters_AIF,
+                        verbose = false)
+        return AIF_agent
+    end
+
     env = PrisonersDilemmaEnv()
 
     # Initialize all agents
@@ -31,13 +55,13 @@ using Plots
 
     function run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB)
         # Initialize agents
-        AIF_agent = init_AIF_agent_beta_lr_pB(beta, lr_pB)
+        AIF_agent = init_AIF_Agent()
         AlgoAgent = AlgoAgent_constructor()
 
         # Initialize environment
         env = PrisonersDilemmaEnv()
 
-        N_TRIALS = 20
+        N_TRIALS = 100
 
         # Starting Observation
         obs1 = [1]
@@ -87,11 +111,9 @@ using Plots
     end
 end
 
-betas = 0.2:0.2:5.5
-lr_pBs = 0.01:0.01:1.0
+learning_rates = 0.1:0.1:1.0
+betas = 0.1:0.1:5.5
 
-betas = 1.5
-lr_pBs = 0.5
 # List of AlgoAgent constructors and names
 AlgoAgent_constructors = [
     TitForTatAgent
@@ -107,9 +129,9 @@ results = []
     results = @distributed (append!) for beta in betas
         local_results = []
         println("Running simulation: beta=$beta")
-        for lr_pB in lr_pBs
+        for learning_rate in learning_rates
             for (AlgoAgent_constructor, AlgoAgent_name) in zip(AlgoAgent_constructors, AlgoAgent_names)
-                result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB)
+                result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, learning_rate)
                 push!(local_results, result)
             end
         end
@@ -119,146 +141,168 @@ end
 
 results_df = DataFrame(results)
 
-grouped_df = combine(groupby(results_df, [:beta, :lr_pB]),
-                     :score_AIF_agent => sum => :total_score_AIF,
-                     :score_AlgoAgent => sum => :total_score_Algo)
+results_df[!, :total_reward] = results_df[!, :score_AIF_agent] .+ results_df[!, :score_AlgoAgent]
 
+x = unique(results_df[!, :lr_pB])
+y = unique(results_df[!, :beta])
 
-sorted_df = sort(grouped_df, :total_score_AIF, rev=true)
+pivot_df = unstack(results_df, :beta, :lr_pB, :score_AIF_agent)
+z = Matrix(pivot_df[:, Not(:beta)])
 
-heatmap_df = unstack(sorted_df, :lr_pB, :beta, :total_score_AIF)
+heatmap(x, y, z,
+        xlabel="Learning Rates", ylabel="Betas",
+        title="Accumulated Total Reward", colorbar_title="Total Reward", size=(800, 700),
+        color=:inferno)
 
-heatmap_matrix = Matrix(heatmap_df[:, 2:end])
+kk
 
-heatmap(betas, lr_pBs, heatmap_matrix, xlabel="lr_pB", ylabel="beta", c=:inferno, title="Heatmap of Total Score AIF Agent")
+############################ Test with all agents #######################################
 
-#jls_filename = raw"SoCultExamProject\ResultData\results_1000Trials_stochastic_df.jls"
+@everywhere begin
+    include("../EnvsAndAgents/AIFInitFunctions.jl")
+    include("../EnvsAndAgents/AlgoAgentsFunctions.jl")
+    include("../EnvsAndAgents/GenerativeModel.jl")
+    include("../EnvsAndAgents/PrisonersDilemmaEnv.jl")
 
-#open(jls_filename, "w") do io
-#    serialize(io, sorted_df)
-#end
-
-function run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB)
-    # Initialize agents
-    AIF_agent = init_AIF_agent_beta_lr_pB(beta, lr_pB)
-    AlgoAgent = AlgoAgent_constructor()
-
-    # Initialize environment
-    env = PrisonersDilemmaEnv()
-
-    N_TRIALS = 20
-
-    # Starting Observation
-    obs1 = [1]
-    obs2 = [1]
-
-    actions_AIF_agent_store = []
-    actions_AlgoAgent_store = []
-
-    obs_AIF_agent_store = []
-    obs_AlgoAgent_store = []
-
-    score_AIF_agent = 0
-    score_AlgoAgent = 0
-
-    # Run simulation
-    for t in 1:N_TRIALS
-
-        infer_states!(AIF_agent, obs1)
-        update_AlgoAgent(AlgoAgent, obs2)
-
-        if get_states(AIF_agent)["action"] !== missing
-            QS_prev = get_history(AIF_agent)["posterior_states"][end-1]
-            update_B!(AIF_agent, QS_prev)
-        end
-
-        infer_policies!(AIF_agent)
-        
-        action_AIF_agent = sample_action!(AIF_agent)
-        action_AlgoAgent = choose_action_AlgoAgent(AlgoAgent)
-        
-        action_AIF_agent = Int(action_AIF_agent[1])
-        push!(actions_AIF_agent_store, action_AIF_agent)
-    
-        action_AlgoAgent = Int(action_AlgoAgent[1])
-        push!(actions_AlgoAgent_store, action_AlgoAgent)
-    
-        obs1, obs2, score_AIF_agent, score_AlgoAgent = trial(env, action_AIF_agent, action_AlgoAgent)
-        obs1 = [findfirst(isequal(obs1), conditions)]
-        obs2 = [findfirst(isequal(obs2), conditions)]
-    
-        push!(obs_AIF_agent_store, obs1)
-        push!(obs_AlgoAgent_store, obs2)
-    
-    end
-    
-    return (AIF_agent="AIF_agent", AlgoAgent_name=AlgoAgent_name, score_AIF_agent=score_AIF_agent, score_AlgoAgent=score_AlgoAgent, beta = beta, lr_pB = lr_pB)
-end
-
-run_simulation(TitForTatAgent, "TitForTatAgent", 1.5, 0.5)
-
-settings = Dict("use_param_info_gain" => false,
+    settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
                     "action_selection" => "deterministic")
 
-include(raw"..\EnvsAndAgents\AIFInitFunctions.jl")
-include(raw"..\EnvsAndAgents\AlgoAgentsFunctions.jl")
-include(raw"..\EnvsAndAgents\GenerativeModel.jl")
-include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+    env = PrisonersDilemmaEnv()
 
+    # Initialize all agents
+    AlgoAgent_constructors = [
+        TitForTatAgent,
+        TitFor2TatsAgent,
+        TwoTitsFor1TatAgent,
+        NastyForgivingTFTAgent,
+        PavlovianAgent,
+        GrofmanAgent,
+        GrimTriggerAgent,
+        ()
+    ]
 
-obs1 = [1]
-obs2 = [1]
+    AlgoAgent_names = [
+        "TitForTatAgent",
+        "TitFor2TatsAgent",
+        "TwoTitsFor1TatAgent",
+        "NastyForgivingTFTAgent",
+        "PavlovianAgent",
+        "GrofmanAgent",
+        "GrimTriggerAgent"
+    ]
 
-env = PrisonersDilemmaEnv()
+    function run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB)
+        # Initialize agents
+        AIF_agent = init_AIF_agent_beta_lr_pB(beta, lr_pB)
+        AlgoAgent = AlgoAgent_constructor()
 
-actions_AIF_agent_store = []
-actions_TFT_agent_store = []
+        # Initialize environment
+        env = PrisonersDilemmaEnv()
 
+        N_TRIALS = 100
 
-obs_AIF_agent_store = []
-obs_TFT_agent_store = []
+        # Starting Observation
+        obs1 = [1]
+        obs2 = [1]
 
-N_TRIALS = 20
+        actions_AIF_agent_store = []
+        actions_AlgoAgent_store = []
 
-AIF_agent = init_AIF_agent_beta_lr_pB(1.5, 0.5)
-TFT_agent = TitForTatAgent()
+        obs_AIF_agent_store = []
+        obs_AlgoAgent_store = []
 
-for t in 1:N_TRIALS
-    println("-------------------- Timestep: $t --------------------")
-    infer_states!(AIF_agent, obs1)
-    update_AlgoAgent(TFT_agent, obs2)
+        AIF_EFE_store = []
 
-    if get_states(AIF_agent)["action"] !== missing
-        QS_prev = get_history(AIF_agent)["posterior_states"][end-1]
-        update_B!(AIF_agent, QS_prev)
+        score_AIF_agent = 0
+        score_AlgoAgent = 0
+
+        # Run simulation
+        for t in 1:N_TRIALS
+
+            infer_states!(AIF_agent, obs1)
+            update_AlgoAgent(AlgoAgent, obs2)
+
+            if get_states(AIF_agent)["action"] !== missing
+                QS_prev = get_history(AIF_agent)["posterior_states"][end-1]
+                update_B!(AIF_agent, QS_prev)
+            end
+
+            infer_policies!(AIF_agent)
+            
+            action_AIF_agent = sample_action!(AIF_agent)
+            action_AlgoAgent = choose_action_AlgoAgent(AlgoAgent)
+            
+            action_AIF_agent = Int(action_AIF_agent[1])
+            push!(actions_AIF_agent_store, action_AIF_agent)
+        
+            action_AlgoAgent = Int(action_AlgoAgent[1])
+            push!(actions_AlgoAgent_store, action_AlgoAgent)
+        
+            obs1, obs2, score_AIF_agent, score_AlgoAgent = trial(env, action_AIF_agent, action_AlgoAgent)
+            obs1 = [findfirst(isequal(obs1), conditions)]
+            obs2 = [findfirst(isequal(obs2), conditions)]
+        
+            push!(obs_AIF_agent_store, obs1)
+            push!(obs_AlgoAgent_store, obs2)
+        
+        end
+        
+        return (AIF_agent="AIF_agent", AlgoAgent_name=AlgoAgent_name, score_AIF_agent=score_AIF_agent, score_AlgoAgent=score_AlgoAgent, beta = beta, lr_pB = lr_pB)
     end
-
-    infer_policies!(AIF_agent)
-    
-    action_AIF_agent = sample_action!(AIF_agent)
-    action_TFT_agent = choose_action_AlgoAgent(TFT_agent)
-    
-    action_AIF_agent = Int(action_AIF_agent[1])
-    push!(actions_AIF_agent_store, action_AIF_agent)
-
-    action_TFT_agent = Int(action_TFT_agent[1])
-    push!(actions_TFT_agent_store, action_TFT_agent)
-
-    println("Action AIF_agent: $action_AIF_agent")
-    println("Action TFT_agent: $action_TFT_agent")
-
-    obs1, obs2, score_AIF_agent, score_TFT_agent = trial(env, action_AIF_agent, action_TFT_agent)
-    obs1 = [findfirst(isequal(obs1), conditions)]
-    obs2 = [findfirst(isequal(obs2), conditions)]
-
-    println("AIF_agent score: $(score_AIF_agent)")
-    println("TFT_agent score: $(score_TFT_agent)")
-
-    push!(obs_AIF_agent_store, obs1)
-    push!(obs_TFT_agent_store, obs2)
-
 end
 
+learning_rates = 0.01:0.01:1.0
+betas = 0.1:0.1:5.5
 
+# List of AlgoAgent constructors and names
+AlgoAgent_constructors = [
+    TitForTatAgent,
+    TitFor2TatsAgent,
+    TwoTitsFor1TatAgent,
+    NastyForgivingTFTAgent,
+    PavlovianAgent,
+    GrofmanAgent,
+    GrimTriggerAgent
+]
 
+AlgoAgent_names = [
+    "TitForTatAgent",
+    "TitFor2TatsAgent",
+    "TwoTitsFor1TatAgent",
+    "NastyForgivingTFTAgent",
+    "PavlovianAgent",
+    "GrofmanAgent",
+    "GrimTriggerAgent"
+]
+
+results = []
+
+@time begin
+    results = @distributed (append!) for beta in betas
+        local_results = []
+        println("Running simulation: beta=$beta")
+        for learning_rate in learning_rates
+            for (AlgoAgent_constructor, AlgoAgent_name) in zip(AlgoAgent_constructors, AlgoAgent_names)
+                result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, learning_rate)
+                push!(local_results, result)
+            end
+        end
+        local_results
+    end
+end
+
+results_df = DataFrame(results)
+
+results_df[!, :total_reward] = results_df[!, :score_AIF_agent] .+ results_df[!, :score_AlgoAgent]
+
+x = unique(results_df[!, :lr_pB])
+y = unique(results_df[!, :beta])
+
+pivot_df = unstack(results_df, :beta, :lr_pB, :score_AIF_agent; combine=sum)
+z = Matrix(pivot_df[:, Not(:beta)])
+
+heatmap(x, y, z,
+        xlabel="Learning Rates", ylabel="Betas",
+        title="Accumulated Total Reward", colorbar_title="Total Reward", size=(800, 700),
+        color=:inferno)

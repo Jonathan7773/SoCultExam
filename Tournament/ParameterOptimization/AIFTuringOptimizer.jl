@@ -9,10 +9,10 @@ using Optim
 addprocs(10)
 
 @everywhere begin
-    include(raw"..\EnvsAndAgents\AIFInitFunctions.jl")
-    include(raw"..\EnvsAndAgents\AlgoAgentsFunctions.jl")
-    include(raw"..\EnvsAndAgents\GenerativeModel.jl")
-    include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+    include(raw"..\..\EnvsAndAgents\AIFInitFunctions.jl")
+    include(raw"..\..\EnvsAndAgents\AlgoAgentsFunctions.jl")
+    include(raw"..\..\EnvsAndAgents\GenerativeModel.jl")
+    include(raw"..\..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
 
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,

@@ -134,7 +134,11 @@ addprocs(10)
             end
             
             if agent1_name == "AIF_Agent"
-                action_agent1 = sample_action!(agent1)
+                if t == 1
+                    action_agent1 = [1]
+                else
+                    action_agent1 = sample_action!(agent1)
+                end
             else
                 action_agent1 = choose_action_AlgoAgent(agent1)
             end
@@ -142,7 +146,11 @@ addprocs(10)
             push!(actions_agent1_store, action_agent1)
         
             if agent2_name == "AIF_Agent"
-                action_agent2 = sample_action!(agent2)
+                if t == 1
+                    action_agent2 = [1]
+                else
+                    action_agent2 = sample_action!(agent2)
+                end
             else
                 action_agent2 = choose_action_AlgoAgent(agent2)
             end
@@ -204,115 +212,3 @@ total_scores_df = DataFrame(agent_name=agent_names, total_score=total_scores)
 ranked_scores_df = sort(total_scores_df, :total_score, rev=true)
 
 ranked_scores_df
-
-#CSV.write("ranked_scores.csv", ranked_scores_df)
-
-# Winner mapping
-
-function get_winner(agent1_name, agent2_name, score_agent1, score_agent2)
-    if score_agent1 > score_agent2
-        return agent1_name
-    elseif score_agent2 > score_agent1
-        return agent2_name
-    else
-        return "Draw"
-    end
-end
-
-# Add a new column with the winner
-results_df[!, :winner] = [get_winner(row.agent1_name, row.agent2_name, row.score_agent1, row.score_agent2) for row in eachrow(results_df)]
-
-agents = unique(vcat(results_df.agent1_name, results_df.agent2_name))
-
-# Initialize a dictionary to store win counts
-win_counts = Dict(agent => 0 for agent in agents)
-
-# Count the wins for each agent
-for row in eachrow(results_df)
-    winner = row.winner
-    if winner != "Draw"
-        win_counts[winner] += 1
-    end
-end
-
-win_counts
-
-agents_array = collect(keys(win_counts))
-wins_array = collect(values(win_counts))
-
-# Convert the win counts to a DataFrame for plotting
-win_counts_df = DataFrame(agent = agents_array, wins = wins_array)
-
-theme(:kk)
-# Create the bar plot
-WinPlot = bar(win_counts_df.agent, win_counts_df.wins, xlabel="Agent", ylabel="Number of Wins", title="Number of Wins per Agent", legend=false, ylim = (0, 7), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-
-# Loser mapping
-
-function get_loser(agent1_name, agent2_name, score_agent1, score_agent2)
-    if score_agent1 < score_agent2
-        return agent1_name
-    elseif score_agent2 < score_agent1
-        return agent2_name
-    else
-        return "Draw"
-    end
-end
-
-# Add a new column with the winner
-results_df[!, :loser] = [get_loser(row.agent1_name, row.agent2_name, row.score_agent1, row.score_agent2) for row in eachrow(results_df)]
-
-agents = unique(vcat(results_df.agent1_name, results_df.agent2_name))
-
-# Initialize a dictionary to store win counts
-loser_counts = Dict(agent => 0 for agent in agents)
-
-# Count the wins for each agent
-for row in eachrow(results_df)
-    loser = row.loser
-    if loser != "Draw"
-        loser_counts[loser] += 1
-    end
-end
-
-loser_counts
-
-agents_array = collect(keys(loser_counts))
-loser_array = collect(values(loser_counts))
-
-# Convert the win counts to a DataFrame for plotting
-loser_counts_df = DataFrame(agent = agents_array, losses = loser_array)
-
-theme(:kk)
-# Create the bar plot
-LossPlot = bar(loser_counts_df.agent, loser_counts_df.losses, xlabel="Agent", ylabel="Number of Losses", title="Number of Losses per Agent", legend=false, ylim = (0, 9), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-##### Draws mapping #####
-results_df
-
-draw_counts = Dict(agent => 0 for agent in agents)
-
-for row in eachrow(results_df)
-    if row.winner == "Draw"
-        draw_counts[row.agent1_name] += 1
-        draw_counts[row.agent2_name] += 1
-    end
-end
-
-agents_array = collect(keys(draw_counts))
-draw_array = collect(values(draw_counts))
-
-draw_counts_df = DataFrame(agent = agents_array, draws = draw_array)
-
-DrawPlot = bar(draw_counts_df.agent, draw_counts_df.draws, xlabel="Agent", ylabel="Number of Draws", title="Number of Draws per Agent", legend=false, ylim = (0, 15), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-
-
-WinPlot
-LossPlot 
-DrawPlot
-
-CombinedWinsPlots = plot(WinPlot, LossPlot, DrawPlot, layout=(1,3), size = (1400, 600), margin=10Plots.mm)
-
-#savefig(CombinedWinsPlots, "CombinedWinsPlots.svg")

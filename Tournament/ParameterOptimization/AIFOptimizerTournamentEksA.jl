@@ -5,17 +5,18 @@ using Serialization
 using Statistics
 using Plots
 
-addprocs(10)
+#addprocs(10)
 
 @everywhere begin
-    include(raw"..\EnvsAndAgents\AIFInitFunctions.jl")
-    include(raw"..\EnvsAndAgents\AlgoAgentsFunctions.jl")
-    include(raw"..\EnvsAndAgents\GenerativeModel.jl")
-    include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+    include(raw"..\..\EnvsAndAgents\AIFInitFunctions.jl")
+    include(raw"..\..\EnvsAndAgents\AlgoAgentsFunctions.jl")
+    include(raw"..\..\EnvsAndAgents\GenerativeModel.jl")
+    include(raw"..\..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
 
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
-                    "action_selection" => "deterministic")
+                    "action_selection" => "deterministic",
+                    "policy_len" => 2)
 
     env = PrisonersDilemmaEnv()
 
@@ -49,7 +50,7 @@ addprocs(10)
         # Initialize environment
         env = PrisonersDilemmaEnv()
 
-        N_TRIALS = 10
+        N_TRIALS = 1000
 
         # Starting Observation
         obs1 = [1]
@@ -101,17 +102,13 @@ addprocs(10)
     end
 end
 
-alphas = 1.0
-betas = 0.5:0.5:5.5
-lr_pBs = 0.1:0.1:1.0
-fr_pBs = 0.1:0.1:1.0
+betas = 0.4:0.4:4.0
+learning_rates = 0.1:0.1:1.0
+forgetting_rates = 0.1:0.1:1.0
 
-alphas = 1.0
-betas = 2.5
-lr_pBs = 0.5
-fr_pBs = 0.5
-
-length(alphas)*length(betas)*length(lr_pBs)*length(fr_pBs)*length(AlgoAgent_names)
+length(betas)
+length(learning_rates)
+length(forgetting_rates)
 
 # List of AlgoAgent constructors and names
 AlgoAgent_constructors = [
@@ -140,11 +137,10 @@ results = []
     results = @distributed (append!) for beta in betas
         local_results = []
         println("Running simulation: beta=$beta")
-        for lr_pB in lr_pBs
-            for fr_pB in fr_pBs
+        for learning_rate in learning_rates
+            for forgetting_rate in forgetting_rates
                 for (AlgoAgent_constructor, AlgoAgent_name) in zip(AlgoAgent_constructors, AlgoAgent_names)
-                    #println("Running simulation: AIF_agent vs $AlgoAgent_name with alpha=$alpha, beta=$beta, lr_pB=$lr_pB, fr_pB=$fr_pB")
-                    result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, lr_pB, fr_pB)
+                    result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, beta, learning_rate, forgetting_rate)
                     push!(local_results, result)
                 end
             end
@@ -155,53 +151,18 @@ end
 
 results_df = DataFrame(results)
 
-grouped_df = combine(groupby(results_df, [:beta, :lr_pB, :fr_pB]),
-                     :score_AIF_agent => sum => :total_score_AIF,
-                     :score_AlgoAgent => sum => :total_score_Algo)
+filtered_df = filter(row -> row.lr_pB == 0.1, results_df)
 
+x = unique(filtered_df.fr_pB)
+y = unique(filtered_df.beta)
 
-sorted_df = sort(grouped_df, :total_score_AIF, rev=true)
+pivot_df = unstack(filtered_df, :beta, :fr_pB, :score_AIF_agent; combine = sum)
 
+z = Matrix(pivot_df[:, Not(:beta)])
 
-
-
-@time begin
-    results = @distributed (append!) for alpha in alphas
-        local_results = []
-        for beta in betas
-            for lr_pB in lr_pBs
-                for fr_pB in fr_pBs
-                    for (AlgoAgent_constructor, AlgoAgent_name) in zip(AlgoAgent_constructors, AlgoAgent_names)
-                        #println("Running simulation: AIF_agent vs $AlgoAgent_name with alpha=$alpha, beta=$beta, lr_pB=$lr_pB, fr_pB=$fr_pB")
-                        result = run_simulation(AlgoAgent_constructor, AlgoAgent_name, alpha, beta, lr_pB, fr_pB)
-                        push!(local_results, result)
-                    end
-                end
-            end
-        end
-        local_results
-    end
-end
-
-results_df = DataFrame(results)
-
-grouped_df = combine(groupby(results_df, [:alpha, :beta, :lr_pB, :fr_pB]),
-                     :score_AIF_agent => sum => :mean_score_AIF,
-                     :score_AlgoAgent => sum => :mean_score_Algo)
-
-
-sorted_df = sort(grouped_df, :mean_score_AIF, rev=true)
-
-view(sorted_df, 580:600, :)
-
-
-alphas = unique(grouped_df.alpha)
-betas = unique(grouped_df.beta)
-lr_pBs = unique(grouped_df.lr_pB)
-fr_pBs = unique(grouped_df.fr_pB)
-
-
-
-
-
+heatmap(x, y, z,
+        xlabel="Forgetting Rates", ylabel="Betas",
+        title="Accumulated Total Reward with Forgetting Rate 1.0",
+        colorbar_title="Total Reward", size=(800, 700),
+        color=:inferno)
 

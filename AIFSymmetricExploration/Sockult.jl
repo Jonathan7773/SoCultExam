@@ -148,6 +148,6 @@ heatmap(action_matrix, color=cmap,
         #xticks=(0:10:160),
         size=(1000, 100))
 
-
+get_history(JONATHAN)["expected_free_energies"]
 
 

@@ -1,16 +1,14 @@
 using ActiveInference
 using Distributed
 using DataFrames
-using CSV
-using Plots
 
-addprocs(10)
+#addprocs(10)
 
 @everywhere begin
-    include(raw"..\EnvsAndAgents\AIFInitFunctions.jl")
-    include(raw"..\EnvsAndAgents\AlgoAgentsFunctions.jl")
-    include(raw"..\EnvsAndAgents\GenerativeModel.jl")
-    include(raw"..\EnvsAndAgents\PrisonersDilemmaEnv.jl")
+    include(raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\SocCult\SoCultRepo\SoCultExam\EnvsAndAgents\AIFInitFunctions.jl")
+    include(raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\SocCult\SoCultRepo\SoCultExam\EnvsAndAgents\AlgoAgentsFunctions.jl")
+    include(raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\SocCult\SoCultRepo\SoCultExam\EnvsAndAgents\GenerativeModel.jl")
+    include(raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\SocCult\SoCultRepo\SoCultExam\EnvsAndAgents\PrisonersDilemmaEnv.jl")
 
     settings = Dict("use_param_info_gain" => false,
                     "use_states_info_gain" => false,
@@ -19,36 +17,16 @@ addprocs(10)
 
     env = PrisonersDilemmaEnv()
 
-    function init_AIF_Agent()
-        parameters_AIF = Dict{String, Real}(
-        "lr_pB" => 0.59,
-        "alpha" => 16
-        )
+    agent_params = Dict(
+    "TitForTatAgent" => (0.4, 0.22, 1.0),
+    "TitFor2TatsAgent" => (0.08, 0.73, 1.0),
+    "TwoTitsFor1TatAgent" => (0.008, 1.0, 1.0),
+    "NastyForgivingTFTAgent" => (0.62, 0.21, 1.0),
+    "PavlovianAgent" => (0.04, 0.01, 1.0),
+    "GrofmanAgent" => (1.96, 0.91, 1.0),
+    "GrimTriggerAgent" => (0.04, 0.19, 1.0)
+    )
 
-        C = array_of_any_zeros(4)
-        C[1][1] = 3.0 # CC
-        C[1][2] = 1.0 # CD
-        C[1][3] = 4.0 # DC
-        C[1][4] = 2.0 # DD
-
-        # C[1][1] = 2.0 # CC
-        # C[1][2] = 4.0 # CD
-        # C[1][3] = 1.0 # DC
-        # C[1][4] = 3.0 # DD
-
-        E = [2.0, 1.0]
-        
-        β = 1.28
-        C[1] = softmax(C[1] * β)
-
-        AIF_agent = init_aif(A_matrix, B_matrix;
-                        C=C,
-                        pB=pB,
-                        settings=settings,
-                        parameters=parameters_AIF,
-                        verbose = false)
-        return AIF_agent
-    end
 
     # Initialize all agents
     agent_constructors = [
@@ -59,7 +37,7 @@ addprocs(10)
         PavlovianAgent,
         GrofmanAgent,
         GrimTriggerAgent,
-        init_AIF_Agent
+        init_AIF_agent_full_eksA
     ]
 
     agent_names = [
@@ -73,10 +51,20 @@ addprocs(10)
         "AIF_Agent"
     ]
 
+
     function run_simulation(agent1_constructor, agent2_constructor, agent1_name, agent2_name)
         # Initialize agents
-        agent1 = agent1_constructor()
-        agent2 = agent2_constructor()
+        if agent1_name == "AIF_Agent"
+            agent1 = agent1_constructor(agent_params[agent2_name]...)
+        else
+            agent1 = agent1_constructor()
+        end
+
+        if agent2_name == "AIF_Agent"
+            agent2 = agent2_constructor(agent_params[agent1_name]...)
+        else
+            agent2 = agent2_constructor()
+        end
 
         # Initialize environment
         env = PrisonersDilemmaEnv()
@@ -205,114 +193,21 @@ ranked_scores_df = sort(total_scores_df, :total_score, rev=true)
 
 ranked_scores_df
 
-#CSV.write("ranked_scores.csv", ranked_scores_df)
+agent_params = Dict(
+    "TitForTatAgent" => (1.475, 0.036, 1.0),
+    "TitFor2TatsAgent" => (1.495, 0.039, 1.0),
+    "TwoTitsFor1TatAgent" => (0.005, 0.001, 1.0),
+    "NastyForgivingTFTAgent" => (1.505, 0.037, 1.0),
+    "PavlovianAgent" => (0.005, 0.001, 1.0),
+    "GrofmanAgent" => (0.005, 0.001, 1.0),
+    "GrimTriggerAgent" => (0.005, 0.001, 1.0)
+)
 
-# Winner mapping
+using JLD2
 
-function get_winner(agent1_name, agent2_name, score_agent1, score_agent2)
-    if score_agent1 > score_agent2
-        return agent1_name
-    elseif score_agent2 > score_agent1
-        return agent2_name
-    else
-        return "Draw"
-    end
-end
+df = DataFrame(results)
 
-# Add a new column with the winner
-results_df[!, :winner] = [get_winner(row.agent1_name, row.agent2_name, row.score_agent1, row.score_agent2) for row in eachrow(results_df)]
+df_filtered = filter(row -> row.AlgoAgent_name == "GrimTriggerAgent", df)
 
-agents = unique(vcat(results_df.agent1_name, results_df.agent2_name))
+ranked = sort!(df_filtered, :score_AIF_agent, rev = true)
 
-# Initialize a dictionary to store win counts
-win_counts = Dict(agent => 0 for agent in agents)
-
-# Count the wins for each agent
-for row in eachrow(results_df)
-    winner = row.winner
-    if winner != "Draw"
-        win_counts[winner] += 1
-    end
-end
-
-win_counts
-
-agents_array = collect(keys(win_counts))
-wins_array = collect(values(win_counts))
-
-# Convert the win counts to a DataFrame for plotting
-win_counts_df = DataFrame(agent = agents_array, wins = wins_array)
-
-theme(:kk)
-# Create the bar plot
-WinPlot = bar(win_counts_df.agent, win_counts_df.wins, xlabel="Agent", ylabel="Number of Wins", title="Number of Wins per Agent", legend=false, ylim = (0, 7), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-
-# Loser mapping
-
-function get_loser(agent1_name, agent2_name, score_agent1, score_agent2)
-    if score_agent1 < score_agent2
-        return agent1_name
-    elseif score_agent2 < score_agent1
-        return agent2_name
-    else
-        return "Draw"
-    end
-end
-
-# Add a new column with the winner
-results_df[!, :loser] = [get_loser(row.agent1_name, row.agent2_name, row.score_agent1, row.score_agent2) for row in eachrow(results_df)]
-
-agents = unique(vcat(results_df.agent1_name, results_df.agent2_name))
-
-# Initialize a dictionary to store win counts
-loser_counts = Dict(agent => 0 for agent in agents)
-
-# Count the wins for each agent
-for row in eachrow(results_df)
-    loser = row.loser
-    if loser != "Draw"
-        loser_counts[loser] += 1
-    end
-end
-
-loser_counts
-
-agents_array = collect(keys(loser_counts))
-loser_array = collect(values(loser_counts))
-
-# Convert the win counts to a DataFrame for plotting
-loser_counts_df = DataFrame(agent = agents_array, losses = loser_array)
-
-theme(:kk)
-# Create the bar plot
-LossPlot = bar(loser_counts_df.agent, loser_counts_df.losses, xlabel="Agent", ylabel="Number of Losses", title="Number of Losses per Agent", legend=false, ylim = (0, 9), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-##### Draws mapping #####
-results_df
-
-draw_counts = Dict(agent => 0 for agent in agents)
-
-for row in eachrow(results_df)
-    if row.winner == "Draw"
-        draw_counts[row.agent1_name] += 1
-        draw_counts[row.agent2_name] += 1
-    end
-end
-
-agents_array = collect(keys(draw_counts))
-draw_array = collect(values(draw_counts))
-
-draw_counts_df = DataFrame(agent = agents_array, draws = draw_array)
-
-DrawPlot = bar(draw_counts_df.agent, draw_counts_df.draws, xlabel="Agent", ylabel="Number of Draws", title="Number of Draws per Agent", legend=false, ylim = (0, 15), xrotation=20, size = (800,400), color = :midnightblue, bg_color = :lightgoldenrod1, margin=20Plots.mm)
-
-
-
-WinPlot
-LossPlot 
-DrawPlot
-
-CombinedWinsPlots = plot(WinPlot, LossPlot, DrawPlot, layout=(1,3), size = (1400, 600), margin=10Plots.mm)
-
-#savefig(CombinedWinsPlots, "CombinedWinsPlots.svg")

@@ -51,7 +51,7 @@ C[1][3] = 4.0 # DC
 C[1][4] = 2.0 # DD
 
 # Parameterize preferences
-β = 1
+β = 1.28
 C[1] = softmax(C[1] * β)
 
 pB = deepcopy(B_matrix)
@@ -59,35 +59,41 @@ pB = deepcopy(B_matrix)
 
 ####= I am not sure how to set this up! xD 
 for i in eachindex(pB)
-    pB[i] = pB[i] .* 2.0
+    pB[i] = pB[i] .* 1.0
 end
 
 
 
-settings=Dict("use_param_info_gain" => false,
+settings_sam=Dict("use_param_info_gain" => false,
               "use_states_info_gain" => false,
-              "action_selection" => "deterministic")
+              "action_selection" => "deterministic",
+              "policy_len" => 1)
 
-parameters_samuel=Dict{String, Real}("lr_pB" => 0.6)
-parameters_jonathan=Dict{String, Real}("lr_pB" => 0.6)
+settings_jon=Dict("use_param_info_gain" => false,
+              "use_states_info_gain" => false,
+              "action_selection" => "deterministic",
+              "policy_len" => 1)
+
+parameters_samuel=Dict{String, Real}("lr_pB" => 0.4)
+parameters_jonathan=Dict{String, Real}("lr_pB" => 0.4)
 
 
 SAMUEL = init_aif(A_matrix, B_matrix;
                     C=C,
                     pB=pB,
-                    settings=settings,
+                    settings=settings_sam,
                     parameters=parameters_samuel);
 
 JONATHAN = init_aif(A_matrix, B_matrix;
                     C=C,
                     pB=pB,
-                    settings=settings,
+                    settings=settings_jon,
                     parameters=parameters_jonathan);
 
 
 env = PrisonersDilemmaEnv()
 
-N_TRIALS = 160
+N_TRIALS = 200
 
 # Starting Observation
 obs1 = [1]

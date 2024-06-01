@@ -32,7 +32,7 @@ settings=Dict("use_param_info_gain" => false,
 
 ########## Creating TitForTatAgent ##############
 learning_rates = 0.1:0.1:1.0
-betas = 0.1:0.1:5.5
+betas = 0.5:0.5:5.0
 
 results = []
 
@@ -48,12 +48,12 @@ current_iteration = 0
             println("Progress: $current_iteration / $total_iterations")
 
             # Reinitialize agents
-            AIF_agent = init_AIF_agent_beta_lr_pB(lr_AIF, beta_AIF)
+            AIF_agent = init_AIF_agent_beta_lr_pB(beta_AIF, lr_AIF)
             
             # Initialize environment
             env = PrisonersDilemmaEnv()
 
-            N_TRIALS = 100
+            N_TRIALS = 10
 
             # Starting Observation
             obs1 = [1]
@@ -115,9 +115,8 @@ results_df[!, :total_reward] = results_df[!, :score_AIF_agent] .+ results_df[!, 
 x = unique(results_df[!, :lr_AIF])
 y = unique(results_df[!, :beta_AIF])
 
-pivot_df = unstack(results_df, :beta_AIF, :lr_AIF, :total_reward)
+pivot_df = unstack(results_df, :beta_AIF, :lr_AIF, :score_AIF_agent)
 z = Matrix(pivot_df[:, Not(:beta_AIF)])
-theme(:juno)
 
 heatmap(x, y, z,
         xlabel="Learning Rates", ylabel="Betas",
@@ -128,6 +127,23 @@ heatmap(x, y, z,
 z_lr = (results_df[results_df[!, :beta_AIF] .== 1.0, :])[!, :total_reward]
 
 plot(x, z_lr, xlabel = "Learning Rates", ylabel = "Total Score", title = "Betas for lr = 1.0", legend = false)
+
+
+AIF_agent = init_AIF_agent_beta_lr_pB(0.5, 1.5)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ############## Parallel Computing Test ##################
 using Distributed
