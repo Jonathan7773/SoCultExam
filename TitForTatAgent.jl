@@ -4,6 +4,9 @@ using Plots
 using ActiveInference
 using LinearAlgebra
 
+#Pkg.develop(path=raw"C:\Users\jonat\Desktop\University\Exam\4_Semester\Continued_ActiveInference\Dev_Branch\ActiveInference.jl")
+
+
 ###### Defining environment ###########
 
 mutable struct PrisonersDilemmaEnv
@@ -76,7 +79,7 @@ B_matrix[1]
 C = array_of_any_zeros(4)
 C[1][1] = 3.0 # CC
 C[1][2] = 0.0 # CD
-C[1][3] = 3.0 # DC
+C[1][3] = 5.0 # DC
 C[1][4] = 1.0 # DD
 
 # Parameterize and keep rations
@@ -90,10 +93,10 @@ for i in eachindex(pB)
 end
 
 settings=Dict("use_param_info_gain" => true,
-              "action_selection" => "stochastic")
+              "action_selection" => "stochastic",
+              "policy_len" => 4)
 
-parameters=Dict("alpha" => 16.0,
-                "lr_pB" => 0.1)
+parameters = Dict{String, Real}("lr_pB" => 1.0)
 
 
 AIF_agent = init_aif(A_matrix, B_matrix;
@@ -132,7 +135,7 @@ end
 TFT_agent = TitForTatAgent()
 ########## Trial loop ###########
 
-N_TRIALS = 160
+N_TRIALS = 1500
 
 # Starting Observation
 obs1 = [1]
@@ -186,11 +189,12 @@ action_matrix = [actions_AIF_store'; actions_TFT_store']
 cmap = ["green", "red"]
 
 # Plot the heatmap
-heatmap(action_matrix, color=cmap,
+heatmap(action_matrix[:,901:1000], color=cmap,
         clims = (1,2),
         legend=false, ylabel="Agent",
         yticks=(1:2, ["AIF", "TFT"]),
         size=(1000, 80))
+
 
 AIF_agent.B[1]
 
