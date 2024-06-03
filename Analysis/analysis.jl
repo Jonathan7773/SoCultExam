@@ -9,7 +9,7 @@ using StatsBase
 using StatsPlots
 using JLD2
 
-data_path = "D:\\Stahovanie\\results.jld2"
+data_path = "results.jld2"
 data = JLD2.load(data_path)
 
 raw_data = data["results"]
