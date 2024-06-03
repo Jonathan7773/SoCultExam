@@ -4,8 +4,9 @@ using Revise
 using DataFrames, Serialization, Plots, LinearAlgebra
 Pkg.develop(path="C:\\Users\\Samuel\\dev\\ActiveInference")
 using ActiveInference
-
-Pkg.add("JLD2")
+using Statistics
+using StatsBase
+using StatsPlots
 using JLD2
 
 data_path = "D:\\Stahovanie\\results.jld2"
@@ -230,6 +231,87 @@ heatmap(x_grimtrigger, y_grimtrigger, z_grimtrigger, xlabel="lr_pB (η)", ylabel
         color=:inferno, size=(800,700))
 
 
+################################################### More Analysis ################################################### 
+
+function create_combined_long_form()
+    df_long = DataFrame()
+    
+    agent_dfs = [
+        (df_titfortat, "TitForTatAgent"),
+        (df_titfor2tats, "TitFor2TatsAgent"),
+        (df_twotitsfor1tat, "TwoTitsFor1TatAgent"),
+        (df_nastyforgivingtft, "NastyForgivingTFTAgent"),
+        (df_pavlovian, "PavlovianAgent"),
+        (df_grofman, "GrofmanAgent"),
+        (df_grimtrigger, "GrimTriggerAgent")
+    ]
+    
+    for (agent_df, agent_name) in agent_dfs
+        temp_df = DataFrame(
+            AgentType = repeat([agent_name], inner=2*size(agent_df, 1)),
+            Score = vcat(agent_df.score_AlgoAgent, agent_df.score_AIF_agent),
+            Category = vcat(fill("AlgoAgent", size(agent_df, 1)), fill("AIF Agent", size(agent_df, 1)))
+        )
+        df_long = vcat(df_long, temp_df)
+    end
+    
+    return df_long
+end
+
+df_combined_long = create_combined_long_form()
+
+@df df_combined_long groupedboxplot(:AgentType, :Score, group=:Category, legend=:topleft,
+                             title="Scores Comparison: Algorithms vs. AIF Agents",
+                             ylabel="Score", rotation=22.5, color=[:teal :red], size = (700,600))
 
 
+#################### BETA (β) Parameter on Reward ####################
+learning_rates = 0.1:0.1:1.0
+colors = [:darkgreen, :green, :green3, :green2, :springgreen3, :springgreen2, :mediumspringgreen, :springgreen1, :seagreen2, :aqua]
 
+p = plot(xlabel="Beta (β)", ylabel="Score of AIF Agent",
+         title="GrimTrigger", legend=:bottomright)
+
+for (i, lr) in enumerate(learning_rates)
+    subset_titfortat = filter(row -> row.lr_pB == lr, df_grimtrigger)
+    plot!(p, subset_titfortat.beta, subset_titfortat.score_AIF_agent, label="lr_pB = $lr", seriestype=:line, linewidth=2,color=colors[i], size = (700,500) 
+    )
+end
+
+display(p)
+
+#################### Learning Rate (η) Parameter on Reward ####################
+
+beta_values = 0.5:0.5:3.0
+colors_betas = ["#2c105c", :midnightblue, "#a52c60", "#f17c4e", "#fdca26", :yellow2]
+
+p = plot(xlabel="Learning Rate (lr_pB)", ylabel="Score of AIF Agent",
+         title="TitForTat", legend=:bottomright, size=(700,500))
+
+for (i, beta) in enumerate(beta_values)
+    subset_grimtrigger = filter(row -> row.beta == beta, df_titfortat)
+    plot!(p, subset_grimtrigger.lr_pB, subset_grimtrigger.score_AIF_agent, label="beta = $beta", seriestype=:line, linewidth=2, color=colors_betas[i])
+end
+
+display(p)
+
+
+(df_grimtrigger, "GrimTriggerAgent")
+
+using ActiveInference
+
+C = array_of_any_zeros(4)
+C[1][1] = 3.0 # CC
+C[1][2] = 1.0 # CD
+C[1][3] = 4.0 # DC
+C[1][4] = 2.0 # DD
+
+β = 0.5
+C[1] = softmax(C[1] * β)
+
+bar(C[1], xlabel="Preferences", ylabel="", title="Softmax-Scaled Preferences β =.5", 
+    xticks=(1:4, ["CC", "CD", "DC", "DD"]), tickfontsize=12,label=false,yticks=0:0.1:1.0, color=:darkorange2, linecolor=:darkorange2)
+
+
+bar(C[1], xlabel="Preferences", ylabel="", title="Softmax-Scaled Preferences β = 0.5", 
+xticks=(1:4, ["CC", "CD", "DC", "DD"]), tickfontsize=12,label=false,yticks=0:0.1:1.0,ylim=(0.0,1.0), color="#2c105c", linecolor="#2c105c")
